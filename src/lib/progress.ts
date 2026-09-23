@@ -1,4 +1,4 @@
-import { STATIONS, cardKey, type Question, type Script, type Station } from './kana'
+import { STATIONS, cardKey, makePrompt, type Prompt, type Question, type Script, type Station } from './kana'
 
 export const MAX_BOX = 5
 export const STAMP_BOX = 3
@@ -149,6 +149,27 @@ export function pickNext(pool: Question[], p: Progress, recent: string[], rand =
   }
   return list[list.length - 1]
 }
+
+/** 여러 글자 문제는 한 문자(히라가나 또는 가타카나)로만 구성하고, ん·を로 시작하지 않게 한다 */
+export function pickPrompt(pool: Question[], p: Progress, recent: string[], length: number, rand = Math.random): Prompt {
+  let list = pool
+  if (length > 1) {
+    const scripts = [...new Set(pool.map((q) => q.script))]
+    const script = scripts[Math.floor(rand() * scripts.length)]
+    list = pool.filter((q) => q.script === script)
+  }
+  const units: Question[] = []
+  let seen = [...recent]
+  for (let i = 0; i < length; i++) {
+    const starters = i === 0 && length > 1 ? list.filter((q) => !BAD_START.includes(q.key.split(':')[1])) : list
+    const q = pickNext(starters.length ? starters : list, p, seen, rand)
+    units.push(q)
+    seen = [...seen, q.key].slice(-3)
+  }
+  return makePrompt(units)
+}
+
+const BAD_START = ['ん', 'を']
 
 export function weakStationIds(p: Progress): string[] {
   const ids = STATIONS.filter((st) =>

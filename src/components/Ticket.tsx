@@ -23,7 +23,7 @@ export default function Ticket({ summary, onAgain, onMap }: Props) {
     <div className="result">
       <article className={`ticket line-${config.mode}`} aria-label="운행 기록">
         <header className="ticket__head">
-          <span>{SCRIPT_META[config.mode].name} · {config.kind === 'express' ? '급행' : '보통'}</span>
+          <span>{SCRIPT_META[config.mode].name} · {config.kind === 'express' ? '급행' : '보통'}{config.length === 'multi' ? ' · 여러 글자' : ''}</span>
           <span className="ticket__kind" lang="ja">乗車券</span>
         </header>
 
@@ -88,7 +88,13 @@ export default function Ticket({ summary, onAgain, onMap }: Props) {
           <ul className="misses">
             {misses.map((m) => (
               <li key={m.q.key}>
-                <span className="misses__kana" lang="ja">{m.q.char}</span>
+                <span className="misses__kana" lang="ja">
+                  {m.q.units.map((u, i) => (
+                    <span key={i} className={m.q.units.length > 1 && !m.unitOk[i] ? 'is-bad' : undefined}>
+                      {u.char}
+                    </span>
+                  ))}
+                </span>
                 <span className="misses__roma">{m.q.romaji}</span>
                 <span className="misses__given">{m.given ? `입력: ${m.given}` : '건너뜀'}</span>
               </li>

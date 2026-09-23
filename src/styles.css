@@ -242,8 +242,11 @@ kbd {
 .sign__badge b { font-size: 22px; font-weight: 800; margin-top: -8px; }
 .sign__station { font-family: var(--f-kana); font-weight: 700; font-size: 15px; color: #6b727a; }
 .sign__kana {
+  --len: 1;
   font-family: var(--f-kana); font-weight: 900;
-  font-size: clamp(120px, 24vw, 200px); line-height: 1; text-align: center;
+  /* 글자 수가 늘면 역명판 폭(내부 약 700px)에 맞춰 줄인다 */
+  font-size: min(clamp(120px, 24vw, 200px), calc(min(700px, 100vw - 72px) / var(--len)));
+  line-height: 1; text-align: center; white-space: nowrap;
   padding: 4px 0 8px; letter-spacing: 0.02em;
   animation: arrive 0.28s cubic-bezier(.2,.8,.3,1);
 }
@@ -257,6 +260,11 @@ kbd {
 }
 .sign__input::placeholder { color: #c3c8cd; font-weight: 600; }
 .sign__input:focus { outline: none; border-bottom-color: var(--line); }
+.sign__input[data-multi='true'] { width: min(520px, 100%); }
+.sign__kana .is-bad { color: var(--miss); }
+.sign__answer b .is-bad { text-decoration: underline 2px; text-underline-offset: 4px; }
+.sign__answer b .is-good { color: #6b727a; }
+.sign__answer b span + span::before { content: '·'; display: inline-block; color: #b3b8bd; margin: 0 6px; text-decoration: none; }
 .sign__hint { min-height: 24px; margin-top: 8px; font-size: 13px; color: #6b727a; text-align: center; }
 .sign__answer { color: var(--miss); font-size: 15px; }
 .sign__answer b { font-family: var(--f-roma); font-weight: 800; font-size: 20px; letter-spacing: 0.08em; }
@@ -337,7 +345,9 @@ kbd {
 .promo--stamp { background: var(--stamp); color: #fff; }
 .result__h { font-size: 17px; margin: 8px 0 0; }
 .result__note { margin: 0; color: var(--muted); }
-.misses { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.misses { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.misses li { min-width: 96px; }
+.misses__kana .is-bad { color: var(--miss); }
 .misses li { background: var(--surface); border-radius: var(--r); padding: 10px; display: flex; flex-direction: column; align-items: center; border-top: 4px solid var(--miss); }
 .misses__kana { font-family: var(--f-kana); font-weight: 900; font-size: 34px; line-height: 1.1; }
 .misses__roma { font-family: var(--f-roma); font-weight: 800; font-size: 17px; letter-spacing: 0.08em; }

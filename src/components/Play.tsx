@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { SCRIPT_META, STATIONS, buildPool, stationName, type Question } from '../lib/kana'
-import { hangulToQwerty, hasHangul, isCorrect, normalize } from '../lib/romaji'
-import { pickNext, type Progress, type Settings } from '../lib/progress'
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties } from 'react'
+import { SCRIPT_META, STATIONS, buildPool, stationName, type Prompt } from '../lib/kana'
+import { gradeUnits, hangulToQwerty, hasHangul, isCorrect, normalize } from '../lib/romaji'
+import { pickPrompt, type Progress, type Settings } from '../lib/progress'
 import { sfx, speak } from '../lib/audio'
 import type { LogItem, TripConfig, TripStats } from '../types'
 
 export const TRIP_LEN = 20
+export const MULTI_TRIP_LEN = 12
 export const EXPRESS_MS = 60_000
 const FAST_MS = 2500
 
@@ -13,7 +14,7 @@ interface Props {
   config: TripConfig
   progress: Progress
   settings: Settings
-  onAnswer: (key: string, ok: boolean, xp: number) => void
+  onAnswer: (marks: { key: string; ok: boolean }[], xp: number) => void
   onFinish: (stats: TripStats) => void
   onQuit: () => void
 }
@@ -27,15 +28,18 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
   const progressRef = useRef(progress)
   progressRef.current = progress
   const recent = useRef<string[]>([])
-  const draw = (): Question => {
-    const q = pickNext(pool, progressRef.current, recent.current)
-    recent.current = [...recent.current, q.key].slice(-3)
+  const multi = config.length === 'multi'
+  const tripLen = multi ? MULTI_TRIP_LEN : TRIP_LEN
+  const draw = (): Prompt => {
+    const len = multi ? 2 + Math.floor(Math.random() * 4) : 1
+    const q = pickPrompt(pool, progressRef.current, recent.current, len)
+    recent.current = [...recent.current, ...q.units.map((u) => u.key)].slice(-3)
     return q
   }
 
   const stats = useRef<TripStats>({ log: [], xp: 0, combo: 0, maxCombo: 0 })
   const [, rerender] = useReducer((x: number) => x + 1, 0)
-  const [q, setQ] = useState<Question>(draw)
+  const [q, setQ] = useState<Prompt>(draw)
   const [input, setInput] = useState('')
   const [phase, setPhase] = useState<Phase>('ask')
   const [prev, setPrev] = useState<LogItem | null>(null)
@@ -60,7 +64,7 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
   const advance = () => {
     window.clearTimeout(timer.current)
     const s = stats.current
-    if (!express && s.log.length >= TRIP_LEN) return finish()
+    if (!express && s.log.length >= tripLen) return finish()
     if (express && Date.now() - startedAt.current >= EXPRESS_MS) return finish()
     setPrev(s.log[s.log.length - 1] ?? null)
     setQ(draw())
@@ -79,13 +83,14 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
     if (ok) {
       s.combo += 1
       s.maxCombo = Math.max(s.maxCombo, s.combo)
-      gained = 10 * multiplier(s.combo) + (ms < FAST_MS ? 5 : 0)
+      gained = 10 * q.units.length * multiplier(s.combo) + (ms < FAST_MS * q.units.length ? 5 : 0)
       s.xp += gained
     } else {
       s.combo = 0
     }
-    s.log.push({ q, given, ok, ms })
-    onAnswer(q.key, ok, gained)
+    const unitOk = ok ? q.units.map(() => true) : q.units.length === 1 ? [false] : gradeUnits(given, q.units)
+    s.log.push({ q, given, ok, ms, unitOk })
+    onAnswer(q.units.map((u, i) => ({ key: u.key, ok: unitOk[i] })), gained)
     if (settings.sound) (ok ? sfx.right(s.combo) : sfx.wrong())
     if (settings.voice) speak(q.char)
     setPhase(ok ? 'right' : 'wrong')
@@ -121,7 +126,8 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
   }
 
   const s = stats.current
-  const station = STATIONS.find((st) => st.id === q.stationId)!
+  const station = STATIONS.find((st) => st.id === q.units[0].stationId)!
+  const last = s.log[s.log.length - 1]
   const lineClass = `line-${q.script}`
   const mult = multiplier(s.combo)
   const qNo = s.log.length + (phase === 'ask' ? 1 : 0)
@@ -150,8 +156,8 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
             <span className="hud__value">{(remaining / 1000).toFixed(1)}</span>
           </div>
         ) : (
-          <div className="hud__train" aria-label={`${TRIP_LEN}문제 중 ${s.log.length}문제 완료`}>
-            {Array.from({ length: TRIP_LEN }, (_, i) => {
+          <div className="hud__train" aria-label={`${tripLen}문제 중 ${s.log.length}문제 완료`}>
+            {Array.from({ length: tripLen }, (_, i) => {
               const item = s.log[i]
               return <span key={i} className={item ? (item.ok ? 'is-ok' : 'is-miss') : i === s.log.length ? 'is-now' : ''} />
             })}
@@ -165,11 +171,15 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
             <small>{SCRIPT_META[config.mode].code}</small>
             <b>{String(Math.max(1, qNo)).padStart(2, '0')}</b>
           </span>
-          <span className="sign__station">{stationName(station, q.script)}</span>
+          <span className="sign__station" lang="ja">{multi ? `${q.units.length}文字` : stationName(station, q.script)}</span>
         </div>
 
-        <div className="sign__kana" lang="ja" key={q.key + s.log.length}>
-          {q.char}
+        <div className="sign__kana" lang="ja" key={q.key + s.log.length} style={{ '--len': Math.max(1, [...q.char].length) } as CSSProperties}>
+          {q.units.map((u, i) => (
+            <span key={i} className={phase === 'wrong' && multi && last && !last.unitOk[i] ? 'is-bad' : undefined}>
+              {u.char}
+            </span>
+          ))}
         </div>
 
         <div className="sign__slot">
@@ -178,6 +188,7 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
           </label>
           <input
             id="answer"
+            data-multi={multi}
             ref={inputRef}
             className="sign__input"
             value={input}
@@ -194,10 +205,23 @@ export default function Play({ config, progress, settings, onAnswer, onFinish, o
           />
           <div id="answer-hint" className="sign__hint" aria-live="polite">
             {phase === 'wrong' ? (
-              <span className="sign__answer">
-                정답 <b>{q.romaji}</b>
-                {q.answers.length > 1 && <em> ({q.answers.slice(1).join(', ')}도 정답)</em>}
-              </span>
+              multi ? (
+                <span className="sign__answer">
+                  정답{' '}
+                  <b>
+                    {q.units.map((u, i) => (
+                      <span key={i} className={last && !last.unitOk[i] ? 'is-bad' : 'is-good'}>
+                        {u.romaji}
+                      </span>
+                    ))}
+                  </b>
+                </span>
+              ) : (
+                <span className="sign__answer">
+                  정답 <b>{q.romaji}</b>
+                  {q.answers.length > 1 && <em> ({q.answers.slice(1).join(', ')}도 정답)</em>}
+                </span>
+              )
             ) : converted ? (
               <span>한글 자판으로 입력 중 → {hangulToQwerty(input).toLowerCase()}</span>
             ) : (

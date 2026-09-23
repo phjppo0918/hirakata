@@ -1,17 +1,21 @@
-import type { Question, ScriptMode } from './lib/kana'
+import type { Prompt, ScriptMode } from './lib/kana'
 
 export type TripKind = 'trip' | 'express'
+export type WordLength = 'single' | 'multi'
 
 export interface TripConfig {
   mode: ScriptMode
   stationIds: string[]
   kind: TripKind
+  length?: WordLength
 }
 
 export interface LogItem {
-  q: Question
+  q: Prompt
   given: string
   ok: boolean
+  /** 글자별 정답 여부 (q.units와 같은 순서) */
+  unitOk: boolean[]
   ms: number
 }
 

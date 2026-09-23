@@ -125,3 +125,26 @@ export function buildPool(stationIds: string[], mode: ScriptMode): Question[] {
   }
   return pool
 }
+
+/** 한 문제. 한 글자 모드면 units가 1개, 여러 글자 모드면 2~5개 */
+export interface Prompt {
+  key: string
+  script: Script
+  char: string
+  romaji: string
+  answers: string[]
+  units: Question[]
+}
+
+export function makePrompt(units: Question[]): Prompt {
+  let answers = ['']
+  for (const u of units) answers = answers.flatMap((pre) => u.answers.map((a) => pre + a))
+  return {
+    key: units.map((u) => u.key).join('+'),
+    script: units[0].script,
+    char: units.map((u) => u.char).join(''),
+    romaji: units.map((u) => u.romaji).join(''),
+    answers: [...new Set(answers)],
+    units,
+  }
+}

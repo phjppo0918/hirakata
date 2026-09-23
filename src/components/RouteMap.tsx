@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { LINES, SCRIPT_META, STATIONS, render, stationName, type Script, type ScriptMode, type Station } from '../lib/kana'
 import { hasStamp, stationMastery, weakStationIds, type Progress } from '../lib/progress'
-import type { TripConfig, TripKind } from '../types'
+import type { TripConfig, TripKind, WordLength } from '../types'
 
 interface Props {
   progress: Progress
@@ -13,6 +13,7 @@ const MODES: ScriptMode[] = ['hira', 'kata', 'mix']
 export default function RouteMap({ progress, onStart }: Props) {
   const [mode, setMode] = useState<ScriptMode>('hira')
   const [kind, setKind] = useState<TripKind>('trip')
+  const [length, setLength] = useState<WordLength>('single')
   const [selected, setSelected] = useState<string[]>(['a'])
   const weak = weakStationIds(progress)
 
@@ -48,11 +49,27 @@ export default function RouteMap({ progress, onStart }: Props) {
           <div className="kinds">
             <button className="kind" aria-pressed={kind === 'trip'} onClick={() => setKind('trip')}>
               <strong>보통</strong>
-              <span>20문제, 시간 제한 없음</span>
+              <span>{length === 'multi' ? '12문제' : '20문제'}, 시간 제한 없음</span>
             </button>
             <button className="kind" aria-pressed={kind === 'express'} onClick={() => setKind('express')}>
               <strong>급행</strong>
               <span>60초 동안 최대한 많이</span>
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset className="field">
+          <legend>글자 수</legend>
+          <div className="kinds">
+            <button className="kind" aria-pressed={length === 'single'} onClick={() => setLength('single')}>
+              <strong>한 글자</strong>
+              <span lang="ja">か → ka</span>
+            </button>
+            <button className="kind" aria-pressed={length === 'multi'} onClick={() => setLength('multi')}>
+              <strong>여러 글자</strong>
+              <span>
+                2~5글자 이어 읽기 · <span lang="ja">かさね</span> → kasane
+              </span>
             </button>
           </div>
         </fieldset>
@@ -76,7 +93,7 @@ export default function RouteMap({ progress, onStart }: Props) {
               '노선도에서 역을 하나 이상 고르세요'
             )}
           </div>
-          <button className="depart__btn" disabled={!selected.length} onClick={() => onStart({ mode, kind, stationIds: selected })}>
+          <button className="depart__btn" disabled={!selected.length} onClick={() => onStart({ mode, kind, length, stationIds: selected })}>
             출발
           </button>
         </div>

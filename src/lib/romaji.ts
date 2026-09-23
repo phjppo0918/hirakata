@@ -35,3 +35,33 @@ export function normalize(input: string): string {
 export function isCorrect(input: string, answers: string[]): boolean {
   return answers.includes(normalize(input))
 }
+
+/**
+ * 여러 글자 답안에서 글자별로 맞았는지 판정한다.
+ * 입력을 글자 단위로 나누는 방법 중 맞은 글자가 가장 많은 것을 고른다.
+ */
+export function gradeUnits(input: string, units: { answers: string[] }[]): boolean[] {
+  const s = normalize(input)
+  const memo = new Map<string, { score: number; marks: boolean[] }>()
+
+  const best = (i: number, k: number): { score: number; marks: boolean[] } => {
+    if (k === units.length) return { score: i === s.length ? 0 : -0.5, marks: [] }
+    const id = `${i}:${k}`
+    const hit = memo.get(id)
+    if (hit) return hit
+    let result = { score: -Infinity, marks: [] as boolean[] }
+    for (const a of units[k].answers) {
+      if (!s.startsWith(a, i)) continue
+      const r = best(i + a.length, k + 1)
+      if (r.score + 1 > result.score) result = { score: r.score + 1, marks: [true, ...r.marks] }
+    }
+    for (let skip = 0; skip <= 4 && i + skip <= s.length; skip++) {
+      const r = best(i + skip, k + 1)
+      if (r.score > result.score) result = { score: r.score, marks: [false, ...r.marks] }
+    }
+    memo.set(id, result)
+    return result
+  }
+
+  return best(0, 0).marks
+}

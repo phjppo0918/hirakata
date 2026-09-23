@@ -77,7 +77,7 @@ export default function App() {
             config={screen.config}
             progress={progress}
             settings={settings}
-            onAnswer={(key, ok, xp) => setProgress((p) => applyAnswer(p, key, ok, xp))}
+            onAnswer={(marks, xp) => setProgress((p) => marks.reduce((acc, m, i) => applyAnswer(acc, m.key, m.ok, i === 0 ? xp : 0), p))}
             onFinish={(stats) => finish(screen.config, stats)}
             onQuit={() => setScreen({ name: 'map' })}
           />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { hangulToQwerty, isCorrect } from './romaji'
-import { STATIONS, buildPool, toKata } from './kana'
-import { applyAnswer, emptyProgress, finishTrip, hasStamp, levelFromXp, liveStreak } from './progress'
+import { gradeUnits, hangulToQwerty, isCorrect } from './romaji'
+import { STATIONS, buildPool, makePrompt, toKata } from './kana'
+import { applyAnswer, emptyProgress, pickPrompt, finishTrip, hasStamp, levelFromXp, liveStreak } from './progress'
 
 describe('romaji', () => {
   it('accepts alternate romanizations', () => {
@@ -58,5 +58,36 @@ describe('progress', () => {
     expect(levelFromXp(99).level).toBe(1)
     expect(levelFromXp(100).level).toBe(2)
     expect(levelFromXp(300).level).toBe(3)
+  })
+})
+
+describe('multi-kana prompts', () => {
+  const pool = buildPool(['sa', 'wa', 'a'], 'hira')
+  const q = (h: string) => pool.find((x) => x.key === `hira:${h}`)!
+
+  it('accepts any mix of alternate romanizations', () => {
+    const p = makePrompt([q('し'), q('ん'), q('あ')])
+    expect(p.char).toBe('しんあ')
+    for (const a of ['shina', 'sinna', 'shin\'a', 'SHI NN A']) expect(isCorrect(a, p.answers)).toBe(true)
+    expect(isCorrect('shi', p.answers)).toBe(false)
+  })
+
+  it('pinpoints which kana were wrong', () => {
+    const p = makePrompt([q('さ'), q('し'), q('す')])
+    expect(gradeUnits('sashisu', p.units)).toEqual([true, true, true])
+    expect(gradeUnits('sasisu', p.units)).toEqual([true, true, true])
+    expect(gradeUnits('sachisu', p.units)).toEqual([true, false, true])
+    expect(gradeUnits('seshisa', p.units)).toEqual([false, true, false])
+    expect(gradeUnits('', p.units)).toEqual([false, false, false])
+  })
+
+  it('keeps one script per prompt and never starts with ん', () => {
+    const mix = buildPool(['a', 'wa'], 'mix')
+    for (let i = 0; i < 200; i++) {
+      const p = pickPrompt(mix, emptyProgress(), [], 5)
+      expect(p.units).toHaveLength(5)
+      expect(new Set(p.units.map((u) => u.script)).size).toBe(1)
+      expect(['ん', 'ン', 'を', 'ヲ']).not.toContain(p.units[0].char)
+    }
   })
 })
